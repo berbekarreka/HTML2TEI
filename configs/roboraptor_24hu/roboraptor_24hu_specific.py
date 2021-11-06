@@ -89,6 +89,7 @@ BLACKLIST_SPEC = []
 
 MULTIPAGE_URL_END = re.compile(r'^\b$')  # Dummy
 
+LINK_FILTER_SUBSTRINGS_SPEC = re.compile('|'.join(['LINK_FILTER_DUMMY_STRING']))
 
 def next_page_of_article_spec(_):
     return None
