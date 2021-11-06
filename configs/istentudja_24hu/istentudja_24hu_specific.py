@@ -7,8 +7,8 @@ from html2tei import parse_date, BASIC_LINK_ATTRS, decompose_listed_subtrees_and
 
 PORTAL_URL_PREFIX = 'https://istentudja.24.hu/'
 
-ARTICLE_ROOT_PARAMS_SPEC = [(('div',), {'class': 'o-post__body o-postCnt post-body'}),
-                            (('div',), {'class': 'o-post__lead lead post-lead cf _ce_measure_widget'})]
+ARTICLE_ROOT_PARAMS_SPEC = [(('div',), {'class': 'o-post__lead lead post-lead cf _ce_measure_widget'}),
+                            (('div',), {'class': 'o-post__body o-postCnt post-body'})]
 
 HTML_BASICS = {'p', 'h3', 'h2', 'h4', 'h5', 'em', 'i', 'b', 'strong', 'mark', 'u', 'sub', 'sup', 'del', 'strike',
                'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'quote', 'figure', 'iframe'}
