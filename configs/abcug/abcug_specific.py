@@ -47,7 +47,7 @@ def get_meta_from_articles_spec(tei_logger, url, bs):
             data['sch:keywords'] = keywords_list
         return data
     else:
-        # Single occurence: https://abcug.hu/kozeposztaly/
+        # Single occurrence: https://abcug.hu/kozeposztaly/
         title = bs.find('p', class_='matrix-item-title')
         if title is not None:
             data['sch:name'] = title.text.strip().encode('raw_unicode_escape').decode('UTF-8')
@@ -83,6 +83,7 @@ def decompose_spec(article_dec):
 
 
 BLACKLIST_SPEC = []
+LINK_FILTER_SUBSTRINGS_SPEC = re.compile('|'.join(['LINK_FILTER_DUMMY_STRING']))
 
 MULTIPAGE_URL_END = re.compile(r'^\b$')  # Dummy
 

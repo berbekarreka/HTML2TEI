@@ -3,13 +3,14 @@
 
 import re
 
-URL_ENDSWITH = re.compile(r'.*\.(hu|com|org|ro)$')
+URL_ENDSWITH = re.compile(r'.*\.(hu|com|org|ro|eu)$')
 URL_STARTSWITH = re.compile(r'http://|https://|www.*')
 REPLACE_IN_URL = (('%2F', '/'), ('%&', '%25&'), ('[', '%5B'), (']', '%5D'), ('%?', '%25?'), ('%20', '%20'), ('%3D', '='),
                   ('%3A//', '://'), ('://://', '://'), ('http://ttp://', 'http://'), ('http://ttps://', 'https://'),
                   ('\"ttp:', 'http:'), ('\\', ''), ('Http', 'http'), ('http//www.', 'http://www.'),
                   ('\"', ''), ('http://tp://', 'http://'), ('http://ps://', 'http://'), ('https://ftp://', 'https://'),
-                  ('https://ttp://', 'https://'), (': ', '%3A '), ('https://ttps://', 'https://'))
+                  ('https://ttp://', 'https://'), (': ', '%3A '), ('https://ttps://', 'https://'),
+                  ('.hu:', '.hu'), ('http%2', ''),  ('.com:', '.com'))
 SLASH_DOT = {'/', '.'}
 
 
@@ -37,7 +38,7 @@ def correct_first_in_link_or_facs(link, portal_url_prefix, extra_key):
     return link
 
 
-def fix_double_or_incorrect_link(link, portal_url_prefix, extra_key, a_url):
+def fix_double_or_incorrect_link(link, portal_url_prefix, portalspec_link_filter, extra_key, a_url):
     """Helper function (for link_corrector) to handle double or incorrect links
        Some links are accidentally or intentionally (web.archive) concatenated and must reconstruct them
          and choose one for the ref tag
@@ -64,7 +65,7 @@ def fix_double_or_incorrect_link(link, portal_url_prefix, extra_key, a_url):
                 link_list3 = []
                 for curr_link in link_list2:
                     # WARNING Recursion! :D
-                    if link_corrector(curr_link, portal_url_prefix, extra_key, a_url):
+                    if link_corrector(curr_link, portal_url_prefix, portalspec_link_filter, extra_key, a_url):
                         link_list3.append(curr_link)
                 if len(link_list3) == 1:
                     link = link_list3[0]
@@ -82,13 +83,15 @@ def fix_double_or_incorrect_link(link, portal_url_prefix, extra_key, a_url):
     return link
 
 
-def link_corrector(link, portal_url_prefix, extra_key, a_url):
+def link_corrector(link, portal_url_prefix, portalspec_link_filter, extra_key, a_url):
     """This function is the main link corrector tool to be used from outside"""
     link = link.strip()
     if link.startswith('<'):
         return None
     link = link.strip()
     if 'file://' in link:
+        return None
+    if portalspec_link_filter.match(link):
         return None
     link = correct_first_in_link_or_facs(link, portal_url_prefix, extra_key)
     if link.count('http') > 1:
@@ -127,7 +130,7 @@ def link_corrector(link, portal_url_prefix, extra_key, a_url):
         else:   # href="mi-a-kozeposztaly.html"  https://abcug.hu/kozeposztaly/
             return None
 
-    link = fix_double_or_incorrect_link(link, portal_url_prefix, extra_key, a_url)
+    link = fix_double_or_incorrect_link(link, portal_url_prefix, portalspec_link_filter, extra_key, a_url)
     if link is None:
         return None
     if link.count('/') < 3 and ('.' not in link[link.find('://') + 3:] or link.endswith('.')):

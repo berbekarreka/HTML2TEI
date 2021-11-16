@@ -25,7 +25,7 @@ PARAGRAPH_AND_INLINES = ({'bekezdes'} | INLINE_TAGS)
 # Only article_body_converter is used outside of this file
 
 
-def correct_and_store_link(tag, link, portal_url_prefix, extra_key, article_url):
+def correct_and_store_link(tag, link, portal_url_prefix, portal_url_filter, extra_key, article_url):
     """This function stores the result of link_corrector in tag.
        The input links can be:
           - good (no repair required)
@@ -34,7 +34,7 @@ def correct_and_store_link(tag, link, portal_url_prefix, extra_key, article_url)
     """
     link_original = link
     tag.attrs.clear()
-    link_new = link_corrector(link, portal_url_prefix, extra_key, article_url)
+    link_new = link_corrector(link, portal_url_prefix, portal_url_filter, extra_key, article_url)
     if link_new is None:
         tag.attrs['original'] = link_original
     elif link_original != link_new:
@@ -124,7 +124,7 @@ def block_specific_renaming(article, block_dict, article_url, tei_logger):
     """Within special ("block") structures, some members must be given a different name.
        Mainly because of TEI rules
     """
-    tei_logger.log('DEBUG', f'block_specific_renamig in {article_url}')
+    tei_logger.log('DEBUG', f'block_specific_renaming in {article_url}')
     for block_root in reversed(article.find_all(BLOCKS)):
         # The structures (which could be recursive) can be handled safely from the inside out (hence reversed).
         #  Iterating from the outside to the inside crosses the boundaries of the levels
@@ -204,6 +204,10 @@ def correct_table_structure(article, bs, article_url, tei_logger):
         for row in tab.find_all('sor_valid'):
             if immediate_text(row) > 0:
                 complex_wrapping(bs, row, 'oszlop_valid', article_url, tei_logger)
+    for row in article.find_all('sor_valid'):
+        for main_subtree in row.find_all(recursive=False):
+            if main_subtree.name != 'oszlop_valid':
+                main_subtree.wrap(bs.new_tag('oszlop_valid'))
 
 
 def missing_root_replacement(bs, divname, rec, root_name, tab):
@@ -380,7 +384,7 @@ def prepare_tei_body(art_child_tags, art_naked_text, article, bs, article_url, t
         writing out as TEI XML.
        If it finds direct text or an inline tag by iterating through the direct subtrees of the body, it converts it
         to a paragraph.
-       This is a variant of the compex_wrapping() method, but with less copy (it is avoidable at this point
+       This is a variant of the complex_wrapping() method, but with less copy (it is avoidable at this point
         with using a list of subtrees as output)
     """
 
@@ -441,8 +445,8 @@ def real_lead_general_test(bs_article, article_url, tei_logger):
             lead.name = 'bekezdes'
 
 
-def normal_tag_names_by_dict_new(article, bs, excluded_tags_fun, tag_normal_dict, link_attrs, url_affix, article_url,
-                                 tei_logger):
+def normal_tag_names_by_dict_new(article, bs, excluded_tags_fun, tag_normal_dict, link_attrs, url_prefix,
+                                 portal_url_filter, article_url, tei_logger):
     """This function generates the dictionary form of the tags, retrieves its normalized name from the dictionary,
         and then performs the renaming and other specific operations accordingly
     """
@@ -469,7 +473,7 @@ def normal_tag_names_by_dict_new(article, bs, excluded_tags_fun, tag_normal_dict
                     select_attributes_to_preserve(tag, extra_key, article_url, tei_logger)
                     if 'target' in tag.attrs.keys():
                         href = tag.attrs['target']
-                        correct_and_store_link(tag, href, url_affix, extra_key, article_url)
+                        correct_and_store_link(tag, href, url_prefix, portal_url_filter, extra_key, article_url)
                         if normalized_name == 'media_hivatkozas' and 'target' not in tag.attrs:
                             tag.name = 'to_unwrap'
 
@@ -486,7 +490,7 @@ def normal_tag_names_by_dict_new(article, bs, excluded_tags_fun, tag_normal_dict
 def article_body_converter(tei_logger, article_url, raw_html, spec_params):
     """This function cleans and converts HTML content into a valid TEI XML"""
     article_roots, decompose_fun, excluded_tags_fun, tag_normal_dict, link_attrs, block_dict, change_by_bigram, \
-        portal_url_prefix = spec_params
+        portal_url_prefix, portal_url_filter = spec_params
     raw_html = raw_html.replace('<br>', ' ')
     bs = BeautifulSoup(raw_html, 'lxml')
     for args, kwargs in article_roots:
@@ -508,7 +512,7 @@ def article_body_converter(tei_logger, article_url, raw_html, spec_params):
 
     # 1) Renaming based on manually evaluated tag table(dictionary)
     normal_tag_names_by_dict_new(article, bs, excluded_tags_fun, tag_normal_dict, link_attrs, portal_url_prefix,
-                                 article_url, tei_logger)
+                                 portal_url_filter, article_url, tei_logger)
 
     for un_tag in article.find_all('szakasz'):
         if immediate_text(un_tag) > 0:
@@ -529,7 +533,6 @@ def article_body_converter(tei_logger, article_url, raw_html, spec_params):
 
     # 4) BLOCK specific RENAMING RULES
     block_specific_renaming(article, block_dict, article_url, tei_logger)
-
     # Decompose/unwrap
     decompose_all(article, 'to_decompose')
     unwrap_all(article, 'to_unwrap')
@@ -580,6 +583,7 @@ def article_body_converter(tei_logger, article_url, raw_html, spec_params):
 
     deal_with_paragraphs(article, article_url, tei_logger)
     unwrap_all(article, 'to_unwrap')
+    missing_root_replacement(bs, 'komment', False, 'komment_root', article)
 
     # 11) Rename to XML tags and insert the extra levels required by XML
     article.name = 'body'
@@ -590,7 +594,7 @@ def article_body_converter(tei_logger, article_url, raw_html, spec_params):
     art_naked_text, art_child_tags, art_desc_tags = imtext_children_descendants_of_tag(article)
 
     # The TEI schema does not tolerates when the direct subtrees of the article body are '<figure>-s', so an extra
-    #  <p>-level must be inserted (at least in the case of the first occurence)
+    #  <p>-level must be inserted (at least in the case of the first occurrence)
     if 'figure' in art_child_tags and len(art_child_tags) == 1:
         for art_child in article.children:
             if art_child.name == 'figure':
